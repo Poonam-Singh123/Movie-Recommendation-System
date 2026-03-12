@@ -1,11 +1,76 @@
 import pandas as pd
 import os
+import zipfile
+import tempfile
+import urllib.request
+import time
+from urllib.error import URLError
+
+
+MOVIELENS_LATEST_SMALL_ZIP_URL = "https://files.grouplens.org/datasets/movielens/ml-latest-small.zip"
+
+
+def _download_and_extract_movielens_small(data_dir: str):
+    os.makedirs(data_dir, exist_ok=True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        zip_path = os.path.join(tmp, "ml-latest-small.zip")
+        last_err = None
+        for attempt in range(1, 4):
+            try:
+                req = urllib.request.Request(
+                    MOVIELENS_LATEST_SMALL_ZIP_URL,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                )
+                with urllib.request.urlopen(req, timeout=20) as resp, open(zip_path, "wb") as out:
+                    while True:
+                        chunk = resp.read(1024 * 256)
+                        if not chunk:
+                            break
+                        out.write(chunk)
+                last_err = None
+                break
+            except (URLError, TimeoutError) as e:
+                last_err = e
+                time.sleep(1.5 * attempt)
+
+        if last_err is not None:
+            raise RuntimeError(
+                "Could not download MovieLens dataset automatically. "
+                "Please download 'ml-latest-small.zip' from https://grouplens.org/datasets/movielens/ "
+                "and place 'movies.csv' and 'ratings.csv' into the project's 'data/' folder."
+            ) from last_err
+
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(tmp)
+
+        extracted_root = os.path.join(tmp, "ml-latest-small")
+        movies_src = os.path.join(extracted_root, "movies.csv")
+        ratings_src = os.path.join(extracted_root, "ratings.csv")
+
+        if not (os.path.exists(movies_src) and os.path.exists(ratings_src)):
+            raise FileNotFoundError(
+                "MovieLens zip extracted but movies.csv/ratings.csv were not found."
+            )
+
+        movies_dst = os.path.join(data_dir, "movies.csv")
+        ratings_dst = os.path.join(data_dir, "ratings.csv")
+
+        # Copy (not move) from temp dir into data dir
+        with open(movies_src, "rb") as r, open(movies_dst, "wb") as w:
+            w.write(r.read())
+        with open(ratings_src, "rb") as r, open(ratings_dst, "wb") as w:
+            w.write(r.read())
+
 
 def load_data():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     movies_path = os.path.join(base_dir, "data", "movies.csv")
     ratings_path = os.path.join(base_dir, "data", "ratings.csv")
+
+    if not (os.path.exists(movies_path) and os.path.exists(ratings_path)):
+        _download_and_extract_movielens_small(os.path.join(base_dir, "data"))
 
     movies = pd.read_csv(movies_path)
     ratings = pd.read_csv(ratings_path)

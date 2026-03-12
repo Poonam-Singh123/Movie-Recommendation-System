@@ -126,6 +126,20 @@ streamlit run app/app.py
 
 ---
 
+## ☁️ Deploy (Streamlit Community Cloud)
+
+This repo may not include large `data/*.csv` files in version control.
+During deployment, if `data/movies.csv` and `data/ratings.csv` are missing, the app will download the
+**MovieLens Latest Small** dataset automatically on first run.
+
+### Posters (TMDB)
+
+To enable movie posters in the UI, set this in Streamlit Secrets:
+
+- `TMDB_API_KEY`: your TMDB API Key (v3 auth)
+
+---
+
 ## 📊 Dataset
 
 Dataset used: **MovieLens Latest Small Dataset**
