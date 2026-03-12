@@ -1,8 +1,15 @@
 import pandas as pd
+import os
 
 def load_data():
-    movies = pd.read_csv("data/movies.csv")
-    ratings = pd.read_csv("data/ratings.csv")
+    base_path = os.path.dirname(os.path.dirname(__file__))
+
+    movies_path = os.path.join(base_path, "data", "movies.csv")
+    ratings_path = os.path.join(base_path, "data", "ratings.csv")
+
+    movies = pd.read_csv(movies_path)
+    ratings = pd.read_csv(ratings_path)
+
     return movies, ratings
 
 
