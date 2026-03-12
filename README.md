@@ -1,5 +1,9 @@
 # 🎬 Movie Recommendation System
 
+## 🌐 Live App
+
+Try it here: https://poonam-movie-recommender.streamlit.app/
+
 ## 📌 Project Overview
 
 This project builds a **Hybrid Movie Recommendation System** using multiple machine learning techniques to provide personalized movie suggestions.

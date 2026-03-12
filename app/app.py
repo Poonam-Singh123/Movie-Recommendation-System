@@ -24,9 +24,10 @@ st.markdown(
 <style>
 /* --- App background + typography --- */
 .stApp {
-  background: radial-gradient(1200px 600px at 10% 0%, rgba(124, 58, 237, 0.12), transparent 60%),
-              radial-gradient(1000px 500px at 90% 10%, rgba(59, 130, 246, 0.12), transparent 55%),
-              linear-gradient(180deg, rgba(15, 23, 42, 0.02), rgba(15, 23, 42, 0.00) 35%);
+  background: radial-gradient(1200px 650px at 12% -10%, rgba(229, 9, 20, 0.22), transparent 55%),
+              radial-gradient(1000px 600px at 92% -5%, rgba(124, 58, 237, 0.18), transparent 55%),
+              radial-gradient(900px 520px at 40% 10%, rgba(59, 130, 246, 0.10), transparent 60%),
+              linear-gradient(180deg, #0b0f19 0%, #05070c 70%, #05070c 100%);
 }
 
 /* tighten default padding a touch */
@@ -36,14 +37,14 @@ st.markdown(
 
 /* --- Hero card --- */
 .hero {
-  border: 1px solid rgba(2, 6, 23, 0.08);
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.18), rgba(59, 130, 246, 0.14));
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: linear-gradient(135deg, rgba(0,0,0,0.55), rgba(124, 58, 237, 0.20));
   border-radius: 18px;
   padding: 20px 22px;
-  box-shadow: 0 12px 34px rgba(2, 6, 23, 0.08);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
 }
-.hero h1 { margin: 0; font-size: 2.0rem; line-height: 1.15; }
-.hero p { margin: 0.35rem 0 0; color: rgba(2, 6, 23, 0.75); font-size: 1.05rem; }
+.hero h1 { margin: 0; font-size: 2.0rem; line-height: 1.15; color: rgba(255,255,255,0.96); }
+.hero p { margin: 0.35rem 0 0; color: rgba(255, 255, 255, 0.78); font-size: 1.05rem; }
 
 /* --- Recommendation cards --- */
 .rec-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -84,6 +85,62 @@ st.markdown(
   font-size: 0.78rem;
   color: rgba(2, 6, 23, 0.72);
   white-space: nowrap;
+}
+
+/* --- Netflix-style row --- */
+.row-title { font-size: 1.25rem; font-weight: 750; color: rgba(255,255,255,0.92); margin: 0.35rem 0 0.75rem; }
+.netflix-row {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 6px 2px 14px;
+  scroll-snap-type: x mandatory;
+}
+.netflix-row::-webkit-scrollbar { height: 10px; }
+.netflix-row::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 999px; }
+.poster-card {
+  width: 160px;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  box-shadow: 0 14px 40px rgba(0,0,0,0.28);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.poster-card:hover { transform: translateY(-4px) scale(1.02); box-shadow: 0 18px 55px rgba(0,0,0,0.35); }
+.poster-img { width: 100%; height: 240px; object-fit: cover; display: block; }
+.poster-overlay {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 10px 10px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.82));
+}
+.poster-title {
+  margin: 0;
+  font-weight: 750;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  color: rgba(255,255,255,0.95);
+  text-shadow: 0 6px 18px rgba(0,0,0,0.55);
+}
+.poster-sub {
+  margin: 0.30rem 0 0;
+  font-size: 0.80rem;
+  color: rgba(255,255,255,0.82);
+}
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.35);
+  color: rgba(255,255,255,0.92);
+  margin-right: 6px;
 }
 
 /* --- Make the primary button pop --- */
@@ -265,15 +322,25 @@ if submitted:
         meta["year"] = meta["title"].map(_extract_year)
         meta_by_title = meta.set_index("title", drop=False).to_dict(orient="index")
 
+        # Ratings summary (avg + count) for nicer cards
+        rating_stats = (
+            df.groupby("movieId")["rating"]
+            .agg(avg_rating="mean", rating_count="count")
+            .reset_index()
+        )
+        rating_by_movie_id = rating_stats.set_index("movieId").to_dict(orient="index")
+
         api_key = _tmdb_api_key()
         placeholder = (
             "https://placehold.co/168x252/png?text=No+Poster&font=roboto"
         )
 
-        st.markdown('<div class="rec-grid">', unsafe_allow_html=True)
+        st.markdown(f'<div class="row-title">Because you liked <span style="color:rgba(255,255,255,0.95)">{selected_movie}</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="netflix-row">', unsafe_allow_html=True)
         for idx, movie in enumerate(recommendations, start=1):
             safe_title = str(movie)
             m = meta_by_title.get(safe_title) or {}
+            movie_id = m.get("movieId")
             year = m.get("year")
             if year is not None and not pd.isna(year):
                 try:
@@ -285,28 +352,46 @@ if submitted:
             genres = (m.get("genres") or "").split("|") if m.get("genres") else []
             genres = [g for g in genres if g and g.lower() != "(no genres listed)"]
 
+            r = rating_by_movie_id.get(movie_id) if movie_id is not None else None
+            avg_rating = None
+            rating_count = None
+            if r:
+                try:
+                    avg_rating = float(r.get("avg_rating")) if r.get("avg_rating") is not None else None
+                except Exception:
+                    avg_rating = None
+                try:
+                    rating_count = int(r.get("rating_count")) if r.get("rating_count") is not None else None
+                except Exception:
+                    rating_count = None
+
             poster_url = None
             if api_key:
                 poster_url = _tmdb_poster_url(safe_title, year, api_key)
             poster_url = poster_url or placeholder
 
-            chips = []
+            title_short = _strip_year(safe_title)
+            badges = []
+            if avg_rating is not None:
+                badges.append(f'<span class="badge">⭐ {avg_rating:.1f}</span>')
+            if rating_count is not None:
+                badges.append(f'<span class="badge">{rating_count:,} ratings</span>')
             if year:
-                chips.append(f'<span class="chip">{year}</span>')
-            for g in genres[:4]:
-                chips.append(f'<span class="chip">{g}</span>')
-            chip_html = f'<div class="chip-row">{"".join(chips)}</div>' if chips else ""
+                badges.append(f'<span class="badge">{year}</span>')
+
+            subtitle_parts = []
+            if genres:
+                subtitle_parts.append(", ".join(genres[:3]))
+            subtitle = " • ".join(subtitle_parts) if subtitle_parts else "Personalized hybrid pick"
 
             st.markdown(
                 f"""
-<div class="rec-card">
-  <div class="rec-row">
-    <img class="rec-poster" src="{poster_url}" alt="Poster" loading="lazy" />
-    <div class="rec-body">
-      <p class="rec-title">{idx}. {safe_title}</p>
-      <p class="rec-meta">Personalized hybrid recommendation</p>
-      {chip_html}
-    </div>
+<div class="poster-card">
+  <img class="poster-img" src="{poster_url}" alt="Poster" loading="lazy" />
+  <div class="poster-overlay">
+    <p class="poster-title">{idx}. {title_short}</p>
+    <p class="poster-sub">{''.join(badges)}</p>
+    <p class="poster-sub" style="opacity:0.92">{subtitle}</p>
   </div>
 </div>
 """,
