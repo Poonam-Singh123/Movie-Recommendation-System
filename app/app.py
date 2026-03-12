@@ -218,8 +218,18 @@ st.markdown(
 
 st.write("")
 
-df = _load_merged()
-movies_df = _load_movies()
+try:
+    df = _load_merged()
+    movies_df = _load_movies()
+except Exception as e:
+    st.error(
+        "Dataset could not be loaded.\n\n"
+        "- If you are deploying, the app will try to download MovieLens (latest-small) automatically.\n"
+        "- If your environment blocks downloads, add `data/movies.csv` and `data/ratings.csv` to the repo (or provide them at runtime).\n\n"
+        f"Details: {type(e).__name__}: {e}"
+    )
+    st.stop()
+
 movie_list = sorted(df["title"].dropna().unique())
 
 left, right = st.columns([1.2, 1.0], vertical_alignment="top")

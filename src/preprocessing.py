@@ -9,58 +9,77 @@ from urllib.error import URLError
 
 MOVIELENS_LATEST_SMALL_ZIP_URL = "https://files.grouplens.org/datasets/movielens/ml-latest-small.zip"
 
+# Backup mirror: download extracted CSVs directly from GitHub raw
+MOVIELENS_GITHUB_RAW_BASE = "https://raw.githubusercontent.com/smanihwr/ml-latest-small/master"
+
 
 def _download_and_extract_movielens_small(data_dir: str):
     os.makedirs(data_dir, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as tmp:
+        movies_dst = os.path.join(data_dir, "movies.csv")
+        ratings_dst = os.path.join(data_dir, "ratings.csv")
+
+        # Try official zip first
         zip_path = os.path.join(tmp, "ml-latest-small.zip")
-        last_err = None
+        zip_err = None
         for attempt in range(1, 4):
             try:
                 req = urllib.request.Request(
                     MOVIELENS_LATEST_SMALL_ZIP_URL,
                     headers={"User-Agent": "Mozilla/5.0"},
                 )
-                with urllib.request.urlopen(req, timeout=20) as resp, open(zip_path, "wb") as out:
+                with urllib.request.urlopen(req, timeout=30) as resp, open(zip_path, "wb") as out:
                     while True:
                         chunk = resp.read(1024 * 256)
                         if not chunk:
                             break
                         out.write(chunk)
-                last_err = None
+                zip_err = None
                 break
             except (URLError, TimeoutError) as e:
-                last_err = e
+                zip_err = e
                 time.sleep(1.5 * attempt)
 
-        if last_err is not None:
-            raise RuntimeError(
-                "Could not download MovieLens dataset automatically. "
-                "Please download 'ml-latest-small.zip' from https://grouplens.org/datasets/movielens/ "
-                "and place 'movies.csv' and 'ratings.csv' into the project's 'data/' folder."
-            ) from last_err
+        if zip_err is None:
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                zf.extractall(tmp)
 
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            zf.extractall(tmp)
+            extracted_root = os.path.join(tmp, "ml-latest-small")
+            movies_src = os.path.join(extracted_root, "movies.csv")
+            ratings_src = os.path.join(extracted_root, "ratings.csv")
 
-        extracted_root = os.path.join(tmp, "ml-latest-small")
-        movies_src = os.path.join(extracted_root, "movies.csv")
-        ratings_src = os.path.join(extracted_root, "ratings.csv")
+            if os.path.exists(movies_src) and os.path.exists(ratings_src):
+                with open(movies_src, "rb") as r, open(movies_dst, "wb") as w:
+                    w.write(r.read())
+                with open(ratings_src, "rb") as r, open(ratings_dst, "wb") as w:
+                    w.write(r.read())
+                return
 
-        if not (os.path.exists(movies_src) and os.path.exists(ratings_src)):
-            raise FileNotFoundError(
-                "MovieLens zip extracted but movies.csv/ratings.csv were not found."
-            )
+        # Fallback: GitHub raw CSVs
+        raw_err = None
+        for attempt in range(1, 4):
+            try:
+                for name, dst in [("movies.csv", movies_dst), ("ratings.csv", ratings_dst)]:
+                    url = f"{MOVIELENS_GITHUB_RAW_BASE}/{name}"
+                    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=30) as resp, open(dst, "wb") as out:
+                        while True:
+                            chunk = resp.read(1024 * 256)
+                            if not chunk:
+                                break
+                            out.write(chunk)
+                raw_err = None
+                return
+            except (URLError, TimeoutError) as e:
+                raw_err = e
+                time.sleep(1.5 * attempt)
 
-        movies_dst = os.path.join(data_dir, "movies.csv")
-        ratings_dst = os.path.join(data_dir, "ratings.csv")
-
-        # Copy (not move) from temp dir into data dir
-        with open(movies_src, "rb") as r, open(movies_dst, "wb") as w:
-            w.write(r.read())
-        with open(ratings_src, "rb") as r, open(ratings_dst, "wb") as w:
-            w.write(r.read())
+        raise RuntimeError(
+            "Could not download MovieLens dataset automatically (zip and GitHub mirror both failed). "
+            "Please download 'ml-latest-small.zip' from https://grouplens.org/datasets/movielens/ "
+            "and place 'movies.csv' and 'ratings.csv' into the project's 'data/' folder."
+        ) from (raw_err or zip_err)
 
 
 def load_data():
